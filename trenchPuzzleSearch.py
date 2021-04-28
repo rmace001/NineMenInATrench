@@ -21,6 +21,22 @@ import pprint
 import traceback
 import datetime
 import time
+import numpy as np
+import pandas as pd
+
+class trenchSearch(object):
+    def __init__(self, startState: str = None, searchOption: str = None, recessPositions: list = [3, 5, 7]):
+        tempState = list(startState)
+        tempStateBottom = [int(tempState[i]) for i in range(len(tempState))]
+        self.state = np.zeros(shape=(2, 9))
+        self.state[1, :] = tempStateBottom
+        self.state = self.state.astype('int8')
+        return
+
+    def goalTest(self):
+        pass
+
+
 
 
 def main():
@@ -54,9 +70,12 @@ def main():
         print(mode)
     elif mode == '2':
         print(mode)
-    else:
+    elif mode == '3':
         # mode == 3
         print(mode)
+    else:
+        print("Error: Invalid mode chosen.")
+    search = trenchSearch(startState=inputTrace, searchOption=mode)
     return
 
 
