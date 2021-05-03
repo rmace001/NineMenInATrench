@@ -15,6 +15,7 @@ Usage: $: python3 trenchPuzzleSearch.py -i 12345670 -m 3
 each element in the heap be a tuple, where the first element is of a type which accepts normal python comparisons
 for example, say I have a class named node, and some cost associated with it.
 Then, I could have a tuple for it in the heap as follows: (node.getCost(), node)
+Due to issues with nodes of equal cost, then the tuples in the heap have three elements: (cost, insertion index, node)
 """
 
 import os
@@ -30,9 +31,9 @@ import heapq
 # import pandas as pd
 
 repeated = set()
-maxQueueSize = 0       # reset this when the set is reset
-totalNodesExpanded = 0 # reset this when the set is reset
-solutionDepth = 0
+maxQueueSize: int = 0        # reset this when the set is reset
+totalNodesExpanded: int = 0  # reset this when the set is reset
+solutionDepth: int = 0
 
 
 def compareTrenchNodes(node=None):
@@ -52,6 +53,26 @@ def uniformCost(node=None):
     return node.weight
 
 
+def trenchEnqueue(priorityQ=None, trenchnode=None, heuristicChoice=None):
+    # We can move a blank tile/recess in four directions: up, down, left, right
+    # We can embed this information into a list of size 4:
+    # * index 0 stores the boolean for the legality of moving up
+    # * index 1 stores the boolean for the legality of moving down
+    # * index 2 stores the boolean for the legality of moving left
+    # * index 3 stores the boolean for the legality of moving right
+    legalMoves = [1] * 4
+
+    # We can have multiple blank tiles/recesses in a trench
+    # Each blank tile/recess has its own set of legal moves
+    legalMovesPerRecess = [legalMoves for _ in range(len(trenchnode.recessPositions))]
+    for recessMoves in legalMovesPerRecess:
+        row = None
+        col = None
+        indexSetFound = set()
+        indexMatrix = trenchnode.findBlanks()
+
+
+
 class myHeap(object):
     def __init__(self, initial=None, key=lambda x: x):
         self.key = key
@@ -68,25 +89,50 @@ class myHeap(object):
         self.index += 1
 
     def pop(self):
-        return heapq.heappop(self._data)[2]
+        if not self.empty():
+            return heapq.heappop(self._data)[2]
+        else:
+            print("Calling pop on an empty queue. Returning None")
+            return None
 
     def getHeap(self):
         return self._data
 
+    def empty(self):
+        return len(self._data) <= 0
+
+    def size(self):
+        return len(self._data)
+
 
 class generalSearch(object):
-    def __init__(self, problem=None, queueingHeuristic=None):
+    def __init__(self, problem=None, queueingHeuristic=None, queueingFunc=None):
         self.problem = problem
         self.queueingHeuristic = queueingHeuristic
+        self.queueingFunction = queueingFunc
         return
 
-    def search(self):
+    def search(self, qSize: int = None,
+               totalNodeExpansions: int = None,
+               finalDepth: int = None,
+               goalNode=None):
         # nodes = makeQueue(makeNode(self.problem.getInitialState()))
         problemList = list()
         problemList.append(self.problem)
         nodes = myHeap(initial=problemList, key=self.queueingHeuristic)
-        print(nodes.getHeap())
-        return True
+        while not nodes.empty():
+            qSize = max(maxQueueSize, nodes.size())
+            node = nodes.pop()
+            repeated.add(np.array2string(node.state))
+            if node.goalTest():
+                goalNode = node
+                finalDepth = node.weight
+                # getPath(node)
+                return True
+            else:
+                totalNodeExpansions += 1
+                self.queueingFunction(nodes, node, self.queueingHeuristic)
+        return False
 
 
 class trenchNode(object):
@@ -146,11 +192,14 @@ class trenchNode(object):
                 dist += 1
         return dist
 
+    def findBlanks(self):
+        return np.where(self.state == 0)
+
 
 def main():
-    ##############################################
+    # ##########################################################################################
     # Main function, Options
-    ##############################################
+    # ##########################################################################################
     parser = argparse.ArgumentParser(description="Nine Men in a Trench Search")
     parser.add_argument('-i', '--input', help='Name of input trace file which should be in cwd')
     parser.add_argument("-m", "--mode",
@@ -161,9 +210,10 @@ def main():
     args = parser.parse_args()
     print("Output args:")
     pprint.pprint(args)
-    ##############################################
+
+    # ##########################################################################################
     # Main
-    ##############################################
+    # ##########################################################################################
     unitTest = False
     if args.input is not None:
         inputTrace = args.input
@@ -185,14 +235,35 @@ def main():
     else:
         print("Error: Invalid mode chosen.")
     # Unit test min heap wrapper
+    # ##########################################################################################
     # test = [(4, 'young'), (5, 'old'), (1, 'baby')]
     # myheap = myHeap(initial=test, key=nodeCost)
     # print(myheap.getHeap())
     # myheap.pop()
+    # print(myheap.empty())
     # print(myheap.getHeap())
-    trench = trenchNode(startState=inputTrace, weight=0, heuristic='Manhattan')
-    genSearch = generalSearch(problem=trench, queueingHeuristic=manhattanDistanceHeuristic)
-    genSearch.search()
+    # myheap.pop()
+    # print(myheap.getHeap())
+    # myheap.pop()
+    # print(myheap.getHeap())
+    # print(myheap.empty())
+    # ##########################################################################################
+    goal      = None
+    trench    = trenchNode(   startState=inputTrace,
+                              weight=0,
+                              heuristic='Manhattan'
+    )
+
+    genSearch = generalSearch(problem=trench,
+                              queueingHeuristic=manhattanDistanceHeuristic,
+                              queueingFunc=trenchEnqueue
+    )
+
+    genSearch.search(         qSize=maxQueueSize,
+                              totalNodeExpansions=totalNodesExpanded,
+                              finalDepth=solutionDepth,
+                              goalNode=goal
+    )
     return
 
 
