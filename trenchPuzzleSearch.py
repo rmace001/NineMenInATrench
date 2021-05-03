@@ -16,6 +16,7 @@ each element in the heap be a tuple, where the first element is of a type which 
 for example, say I have a class named node, and some cost associated with it.
 Then, I could have a tuple for it in the heap as follows: (node.getCost(), node)
 Due to issues with nodes of equal cost, then the tuples in the heap have three elements: (cost, insertion index, node)
+
 """
 
 import argparse
@@ -27,10 +28,6 @@ import heapq
 
 
 repeated = set()
-# recessPositions = {3, 5, 7}
-# experimental: 3 is the goal, changed goal test and manhattan distance functions
-recessPositions = {1, 2}
-
 
 # unit test node cost function for min heap wrapper class
 # def nodeCost(node):
@@ -61,7 +58,7 @@ def trenchEnqueue(priorityQ=None, trenchnode=None):
                 flagLeft = False
             elif col == trenchnode.state.shape[1] - 1:
                 flagRight = False
-            if col not in recessPositions:
+            if col not in trenchnode.recessPos:
                 flagUp = False
 
         if flagUp:
@@ -176,6 +173,8 @@ class generalSearch(object):
 
 
 class trenchNode(object):
+    recessPos = None
+
     def __init__(self, startState: str = None,
                  heuristic: str = None,
                  weight: int = 0,
@@ -191,7 +190,7 @@ class trenchNode(object):
             tempStateBottom = [int(tempState[i]) for i in range(len(tempState))]
             self.state = np.zeros(shape=(2, len(tempState)))
             self.state[0, :] = tempStateTop
-            self.state[0, list(recessPositions)] = 0
+            self.state[0, list(trenchNode.recessPos)] = 0
             self.state[1, :] = tempStateBottom
             self.state = self.state.astype('int8')
             self.weight = weight
@@ -248,11 +247,9 @@ def main():
     # Main function, Options
     # ##########################################################################################
     parser = argparse.ArgumentParser(description="Nine Men in a Trench Search")
-    parser.add_argument('-i', '--input', help='Name of input trace file which should be in cwd')
-    parser.add_argument("-m", "--mode",
-                        default='3',
-                        help='mode 1: Uniform Cost Search; mode 2: A* with Misplaced Tile heuristic; mode 3: \
-                              A* with Manhattan Distance Heuristic')
+    parser.add_argument('-i', '--input', help='Input Trench')
+    parser.add_argument('-r', '--recesses', help='Input Recess Positions')
+    parser.add_argument("-m", "--mode", default='1', help='mode 1: A* with Manhattan Distance Heuristic')
     parser.add_argument('-d', '--debug', help='Debug mode')
     args = parser.parse_args()
     print("Args:")
@@ -272,12 +269,10 @@ def main():
 
     if mode == '1':
         pass
-    elif mode == '2':
-        pass
-    elif mode == '3':
-        pass
     else:
         print("Error: Invalid mode chosen.")
+
+
     # Unit test min heap wrapper
     # ##########################################################################################
     # test = [(4, 'young'), (5, 'old'), (1, 'baby')]
@@ -292,22 +287,23 @@ def main():
     # print(myheap.getHeap())
     # print(myheap.empty())
     # ##########################################################################################
-    trench      =    trenchNode(startState=inputTrace,
-                                weight=0,
-                                heuristic='Manhattan'
+    trenchNode.recessPos = set([int(i) for i in args.recesses])
+    trench               =    trenchNode(startState=inputTrace,
+                                         weight=0,
+                                         heuristic='Manhattan'
     )
 
-    genSearch   = generalSearch(problem=trench,
-                                queueingHeuristic=aStar,
-                                queueingFunc=trenchEnqueue
+    genSearch            = generalSearch(problem=trench,
+                                         queueingHeuristic=aStar,
+                                         queueingFunc=trenchEnqueue
     )
 
     answer, maxQueueSize, totalNodesExpanded, solutionDepth = genSearch.search()
 
-    print(f'Solution Exists?    {answer}')
-    print(f'Maximum queue size: {maxQueueSize}')
-    print(f'Nodes expanded:     {totalNodesExpanded}')
-    print(f'Solution depth:     {solutionDepth}')
+    print(f'Solution Exists?             {answer}')
+    print(f'Maximum queue size:          {maxQueueSize}')
+    print(f'Nodes expanded:              {totalNodesExpanded}')
+    print(f'Solution depth:              {solutionDepth}')
     return
 
 
@@ -320,4 +316,4 @@ if __name__ == '__main__':
         print("Fail End Process: {0}".format(errorMain))
         traceback.print_exc()
     qStop = datetime.datetime.now()
-    print("Execution time: " + str(qStop - pStart))
+    print("Execution time:              " + str(qStop - pStart))
