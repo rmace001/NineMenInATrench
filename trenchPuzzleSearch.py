@@ -31,13 +31,10 @@ import heapq
 # import pandas as pd
 
 repeated = set()
-maxQueueSize: int = 0        # reset this when the set is reset
-totalNodesExpanded: int = 0  # reset this when the set is reset
-solutionDepth: int = 0
+# recessPositions = {3, 5, 7}
+# experimental: 3 is the goal, changed goal test and manhattan distance functions
+recessPositions = {2, 3}
 
-
-def compareTrenchNodes(node=None):
-    return node
 
 
 # unit test node cost function for min heap wrapper class
@@ -46,14 +43,14 @@ def nodeCost(node):
 
 
 def manhattanDistanceHeuristic(node=None):
-    return node.weight + node.manhattanDistance()
+    return node.weight + node.heuristic
 
 
 def uniformCost(node=None):
     return node.weight
 
 
-def trenchEnqueue(priorityQ=None, trenchnode=None, heuristicChoice=None):
+def trenchEnqueue(priorityQ=None, trenchnode=None):
     # We can move a blank tile/recess in four directions: up, down, left, right
     indexMatrix = trenchnode.findBlanks()
     for i in range(len(indexMatrix[0])):
@@ -73,7 +70,7 @@ def trenchEnqueue(priorityQ=None, trenchnode=None, heuristicChoice=None):
                 flagLeft = False
             elif col == trenchnode.state.shape[1] - 1:
                 flagRight = False
-            if col not in trenchnode.recessPositions:
+            if col not in recessPositions:
                 flagUp = False
 
         if flagUp:
@@ -112,7 +109,7 @@ def trenchEnqueue(priorityQ=None, trenchnode=None, heuristicChoice=None):
 
 def getPath(trenchnode):
     stack = list()
-    while trenchnode.parent is not None:
+    while trenchnode is not None:
         stack.append(trenchnode)
         trenchnode = trenchnode.parent
 
@@ -162,17 +159,16 @@ class generalSearch(object):
         self.queueingFunction = queueingFunc
         return
 
-    def search(self, qSize: int = None,
-               totalNodeExpansions: int = None,
-               finalDepth: int = None,
-               goalNode=None):
-        # nodes = makeQueue(makeNode(self.problem.getInitialState()))
-        problemList = list()
-        problemList.append(self.problem)
-        nodes = myHeap(initial=problemList, key=self.queueingHeuristic)
-        minCostSoFar = 100
+    def search(self):
+        qSize               = 0
+        totalNodeExpansions = 0
+        finalDepth          = 0
+        goalNode            = None
+        # nodes =           MAKE-QUEUE(MAKE-NODE(self.problem.getInitialState()))
+        nodes               = myHeap(initial=[self.problem], key=self.queueingHeuristic)
+        minCostSoFar        = 100
         while not nodes.empty():
-            qSize = max(maxQueueSize, nodes.size())
+            qSize = max(qSize, nodes.size())
             node = nodes.pop()
             if minCostSoFar > node.heuristic:
                 minCostSoFar = min(minCostSoFar, node.heuristic)
@@ -182,17 +178,16 @@ class generalSearch(object):
                 goalNode = node
                 finalDepth = node.weight
                 getPath(trenchnode=node)
-                return True
+                return True, qSize, totalNodeExpansions, finalDepth
             else:
                 totalNodeExpansions += 1
-                self.queueingFunction(nodes, node, self.queueingHeuristic)
-        return False
+                self.queueingFunction(nodes, node)
+        return False, qSize, totalNodeExpansions, finalDepth
 
 
 class trenchNode(object):
     def __init__(self, startState: str = None,
-                 recessPositions: list = [3, 5, 7],
-                 heuristic: int = 0,
+                 heuristic: str = 0,
                  weight: int = 0,
                  parent=None
     ):
@@ -201,21 +196,19 @@ class trenchNode(object):
             self.weight = parent.weight
             self.heuristic = parent.heuristic
             self.state = np.array(parent.state)
-            self.recessPositions = list(parent.recessPositions)
         else:
             if startState is None:
                 raise ValueError("No state passed for node initialization")
             tempState = list(startState)
-            tempStateTop = [-1 for i in range(len(tempState))]
+            tempStateTop = [-1 for _ in range(len(tempState))]
             tempStateBottom = [int(tempState[i]) for i in range(len(tempState))]
-            self.state = np.zeros(shape=(2, 9))
+            self.state = np.zeros(shape=(2, len(tempState)))
             self.state[0, :] = tempStateTop
-            self.state[0, recessPositions] = 0
+            self.state[0, list(recessPositions)] = 0
             self.state[1, :] = tempStateBottom
             self.state = self.state.astype('int8')
             self.weight = weight
             self.parent = None
-            self.recessPositions = recessPositions
             if heuristic == 'Manhattan':
                 self.heuristic = self.manhattanDistance()
         return
@@ -230,16 +223,15 @@ class trenchNode(object):
     def goalTest(self):
         # The sergent has the highest rank, so it's represented as the value 9
         # does the value in row 1 column 0 have a value of 9?
-        if self.state[1, 0] == 9:
+        if self.state[1, 0] == 1:
             return True
         else:
             return False
 
     def manhattanDistance(self):
         dist = 0
-        for i in range(len(self.state[1, :])):
-            if self.state[1, i] != 9:
-                dist += 1
+        x = np.where(self.state == 1)
+        dist += abs(1 - x[0][0]) + abs(0 - x[1][0])
         return dist
 
     def findBlanks(self):
@@ -326,7 +318,6 @@ def main():
     # print(myheap.getHeap())
     # print(myheap.empty())
     # ##########################################################################################
-    goal      = None
     trench    = trenchNode(   startState=inputTrace,
                               weight=0,
                               heuristic='Manhattan'
@@ -337,11 +328,12 @@ def main():
                               queueingFunc=trenchEnqueue
     )
 
-    genSearch.search(         qSize=maxQueueSize,
-                              totalNodeExpansions=totalNodesExpanded,
-                              finalDepth=solutionDepth,
-                              goalNode=goal
-    )
+    answer, maxQueueSize, totalNodesExpanded, solutionDepth = genSearch.search()
+
+    print(f'Solution Exists?    {answer}')
+    print(f'Maximum queue size: {maxQueueSize}')
+    print(f'Nodes expanded:     {totalNodesExpanded}')
+    print(f'Solution depth:     {solutionDepth}')
     return
 
 
