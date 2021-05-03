@@ -18,7 +18,6 @@ Then, I could have a tuple for it in the heap as follows: (node.getCost(), node)
 Due to issues with nodes of equal cost, then the tuples in the heap have three elements: (cost, insertion index, node)
 """
 
-import os
 import argparse
 import pprint
 import traceback
@@ -27,27 +26,19 @@ import numpy as np
 import heapq
 
 
-# import time
-# import pandas as pd
-
 repeated = set()
 # recessPositions = {3, 5, 7}
 # experimental: 3 is the goal, changed goal test and manhattan distance functions
-recessPositions = {2, 3}
-
+recessPositions = {1, 2}
 
 
 # unit test node cost function for min heap wrapper class
-def nodeCost(node):
-    return node[0]
+# def nodeCost(node):
+#     return node[0]
 
 
-def manhattanDistanceHeuristic(node=None):
+def aStar(node=None):
     return node.weight + node.heuristic
-
-
-def uniformCost(node=None):
-    return node.weight
 
 
 def trenchEnqueue(priorityQ=None, trenchnode=None):
@@ -74,45 +65,52 @@ def trenchEnqueue(priorityQ=None, trenchnode=None):
                 flagUp = False
 
         if flagUp:
-            newnode = trenchNode(parent=trenchnode)
+            newnode               = trenchNode(parent=trenchnode)
             newnode.up(i=row, j=col)
-            newnode.weight += 1
-            newnode.heuristic = newnode.manhattanDistance()
             if np.array2string(newnode.state) not in repeated:
+                newnode.parent    = trenchnode
+                newnode.weight    = trenchnode.weight + 1
+                newnode.heuristic = newnode.manhattanDistance()
                 priorityQ.push(newnode)
 
         if flagDown:
-            newnode = trenchNode(parent=trenchnode)
+            newnode               = trenchNode(parent=trenchnode)
             newnode.down(i=row, j=col)
-            newnode.weight += 1
-            newnode.heuristic = newnode.manhattanDistance()
             if np.array2string(newnode.state) not in repeated:
+                newnode.parent    = trenchnode
+                newnode.weight    = trenchnode.weight + 1
+                newnode.heuristic = newnode.manhattanDistance()
                 priorityQ.push(newnode)
 
         if flagLeft:
-            newnode = trenchNode(parent=trenchnode)
+            newnode               = trenchNode(parent=trenchnode)
             newnode.left(i=row, j=col)
-            newnode.weight += 1
-            newnode.heuristic = newnode.manhattanDistance()
             if np.array2string(newnode.state) not in repeated:
+                newnode.parent    = trenchnode
+                newnode.weight    = trenchnode.weight + 1
+                newnode.heuristic = newnode.manhattanDistance()
                 priorityQ.push(newnode)
 
         if flagRight:
-            newnode = trenchNode(parent=trenchnode)
+            newnode               = trenchNode(parent=trenchnode)
             newnode.right(i=row, j=col)
-            newnode.weight += 1
-            newnode.heuristic = newnode.manhattanDistance()
             if np.array2string(newnode.state) not in repeated:
+                newnode.parent    = trenchnode
+                newnode.weight    = trenchnode.weight + 1
+                newnode.heuristic = newnode.manhattanDistance()
                 priorityQ.push(newnode)
     return
 
 
-def getPath(trenchnode):
+def getPath(trenchnode=None):
     stack = list()
     while trenchnode is not None:
         stack.append(trenchnode)
         trenchnode = trenchnode.parent
 
+    top = stack.pop()
+    print('Start state:')
+    print(top)
     while len(stack) > 0:
         top = stack.pop()
         print(f'The best state to expand when g(n) = {top.weight} and h(n) = {top.heuristic} is')
@@ -136,7 +134,7 @@ class myHeap(object):
         self.index += 1
 
     def pop(self):
-        if not self.empty():
+        if not len(self._data) <= 0:
             return heapq.heappop(self._data)[2]
         else:
             print("Calling pop on an empty queue. Returning None")
@@ -154,47 +152,36 @@ class myHeap(object):
 
 class generalSearch(object):
     def __init__(self, problem=None, queueingHeuristic=None, queueingFunc=None):
-        self.problem = problem
+        self.problem           = problem
         self.queueingHeuristic = queueingHeuristic
-        self.queueingFunction = queueingFunc
+        self.queueingFunction  = queueingFunc
         return
 
     def search(self):
-        qSize               = 0
-        totalNodeExpansions = 0
-        finalDepth          = 0
-        goalNode            = None
-        # nodes =           MAKE-QUEUE(MAKE-NODE(self.problem.getInitialState()))
-        nodes               = myHeap(initial=[self.problem], key=self.queueingHeuristic)
-        minCostSoFar        = 100
+        qSize                  = 0
+        totalNodeExpansions    = 0
+        # nodes                = MAKE-QUEUE(MAKE-NODE(self.problem.getInitialState()))
+        nodes                  = myHeap(initial=[self.problem], key=self.queueingHeuristic)
         while not nodes.empty():
             qSize = max(qSize, nodes.size())
-            node = nodes.pop()
-            if minCostSoFar > node.heuristic:
-                minCostSoFar = min(minCostSoFar, node.heuristic)
-                print(f'Minimum Heuristic has been updated to {minCostSoFar}!')
+            node  = nodes.pop()
             repeated.add(np.array2string(node.state))
             if node.goalTest():
-                goalNode = node
-                finalDepth = node.weight
                 getPath(trenchnode=node)
-                return True, qSize, totalNodeExpansions, finalDepth
+                return True, qSize, totalNodeExpansions, node.weight
             else:
                 totalNodeExpansions += 1
                 self.queueingFunction(nodes, node)
-        return False, qSize, totalNodeExpansions, finalDepth
+        return False, qSize, totalNodeExpansions, node.weight
 
 
 class trenchNode(object):
     def __init__(self, startState: str = None,
-                 heuristic: str = 0,
+                 heuristic: str = None,
                  weight: int = 0,
                  parent=None
     ):
         if parent is not None:
-            self.parent = parent
-            self.weight = parent.weight
-            self.heuristic = parent.heuristic
             self.state = np.array(parent.state)
         else:
             if startState is None:
@@ -213,26 +200,16 @@ class trenchNode(object):
                 self.heuristic = self.manhattanDistance()
         return
 
-    def __eq__(self, other):
-        return np.array_equal(self.state, other.state)
-
     def __repr__(self):
-        string = f'Trench Node distance: {self.weight + self.heuristic} \nTrench:\n{np.array2string(self.state)}'
-        return string  # TODO, verify this later
+        return f'f(n) = g(n) + h(n) = {self.weight + self.heuristic}. Trench:\n{np.array2string(self.state)}\n'
 
     def goalTest(self):
-        # The sergent has the highest rank, so it's represented as the value 9
-        # does the value in row 1 column 0 have a value of 9?
-        if self.state[1, 0] == 1:
-            return True
-        else:
-            return False
+        # Does the value in row 1 column 0 have a value of 1?
+        return self.state[1, 0] == 1
 
     def manhattanDistance(self):
-        dist = 0
         x = np.where(self.state == 1)
-        dist += abs(1 - x[0][0]) + abs(0 - x[1][0])
-        return dist
+        return abs(1 - x[0][0]) + abs(0 - x[1][0])
 
     def findBlanks(self):
         return np.where(self.state == 0)
@@ -278,16 +255,14 @@ def main():
                               A* with Manhattan Distance Heuristic')
     parser.add_argument('-d', '--debug', help='Debug mode')
     args = parser.parse_args()
-    print("Output args:")
+    print("Args:")
     pprint.pprint(args)
 
     # ##########################################################################################
     # Main
     # ##########################################################################################
-    unitTest = False
     if args.input is not None:
         inputTrace = args.input
-        print(inputTrace)
     else:
         print('No input passed in, see -h argument for help. Exiting...')
         return
@@ -296,12 +271,11 @@ def main():
         mode = args.mode
 
     if mode == '1':
-        print(mode)
+        pass
     elif mode == '2':
-        print(mode)
+        pass
     elif mode == '3':
-        # mode == 3
-        print(mode)
+        pass
     else:
         print("Error: Invalid mode chosen.")
     # Unit test min heap wrapper
@@ -318,14 +292,14 @@ def main():
     # print(myheap.getHeap())
     # print(myheap.empty())
     # ##########################################################################################
-    trench    = trenchNode(   startState=inputTrace,
-                              weight=0,
-                              heuristic='Manhattan'
+    trench      =    trenchNode(startState=inputTrace,
+                                weight=0,
+                                heuristic='Manhattan'
     )
 
-    genSearch = generalSearch(problem=trench,
-                              queueingHeuristic=manhattanDistanceHeuristic,
-                              queueingFunc=trenchEnqueue
+    genSearch   = generalSearch(problem=trench,
+                                queueingHeuristic=aStar,
+                                queueingFunc=trenchEnqueue
     )
 
     answer, maxQueueSize, totalNodesExpanded, solutionDepth = genSearch.search()
