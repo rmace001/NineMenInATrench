@@ -55,22 +55,72 @@ def uniformCost(node=None):
 
 def trenchEnqueue(priorityQ=None, trenchnode=None, heuristicChoice=None):
     # We can move a blank tile/recess in four directions: up, down, left, right
-    # We can embed this information into a list of size 4:
-    # * index 0 stores the boolean for the legality of moving up
-    # * index 1 stores the boolean for the legality of moving down
-    # * index 2 stores the boolean for the legality of moving left
-    # * index 3 stores the boolean for the legality of moving right
-    legalMoves = [1] * 4
+    indexMatrix = trenchnode.findBlanks()
+    for i in range(len(indexMatrix[0])):
+        flagUp    = True
+        flagDown  = True
+        flagLeft  = True
+        flagRight = True
+        row       = indexMatrix[0][i]
+        col       = indexMatrix[1][i]
+        if row == 0:
+            flagUp = False
+            flagLeft = False
+            flagRight = False
+        else:
+            flagDown = False
+            if col == 0:
+                flagLeft = False
+            elif col == trenchnode.state.shape[1] - 1:
+                flagRight = False
+            if col not in trenchnode.recessPositions:
+                flagUp = False
 
-    # We can have multiple blank tiles/recesses in a trench
-    # Each blank tile/recess has its own set of legal moves
-    legalMovesPerRecess = [legalMoves for _ in range(len(trenchnode.recessPositions))]
-    for recessMoves in legalMovesPerRecess:
-        row = None
-        col = None
-        indexSetFound = set()
-        indexMatrix = trenchnode.findBlanks()
+        if flagUp:
+            newnode = trenchNode(parent=trenchnode)
+            newnode.up(i=row, j=col)
+            newnode.weight += 1
+            newnode.heuristic = newnode.manhattanDistance()
+            if np.array2string(newnode.state) not in repeated:
+                priorityQ.push(newnode)
 
+        if flagDown:
+            newnode = trenchNode(parent=trenchnode)
+            newnode.down(i=row, j=col)
+            newnode.weight += 1
+            newnode.heuristic = newnode.manhattanDistance()
+            if np.array2string(newnode.state) not in repeated:
+                priorityQ.push(newnode)
+
+        if flagLeft:
+            newnode = trenchNode(parent=trenchnode)
+            newnode.left(i=row, j=col)
+            newnode.weight += 1
+            newnode.heuristic = newnode.manhattanDistance()
+            if np.array2string(newnode.state) not in repeated:
+                priorityQ.push(newnode)
+
+        if flagRight:
+            newnode = trenchNode(parent=trenchnode)
+            newnode.right(i=row, j=col)
+            newnode.weight += 1
+            newnode.heuristic = newnode.manhattanDistance()
+            if np.array2string(newnode.state) not in repeated:
+                priorityQ.push(newnode)
+    return
+
+
+def getPath(trenchnode):
+    stack = list()
+    while trenchnode.parent is not None:
+        stack.append(trenchnode)
+        trenchnode = trenchnode.parent
+
+    while len(stack) > 0:
+        top = stack.pop()
+        print(f'The best state to expand when g(n) = {top.weight} and h(n) = {top.heuristic} is')
+        print(top)
+    return
 
 
 class myHeap(object):
@@ -120,14 +170,18 @@ class generalSearch(object):
         problemList = list()
         problemList.append(self.problem)
         nodes = myHeap(initial=problemList, key=self.queueingHeuristic)
+        minCostSoFar = 100
         while not nodes.empty():
             qSize = max(maxQueueSize, nodes.size())
             node = nodes.pop()
+            if minCostSoFar > node.heuristic:
+                minCostSoFar = min(minCostSoFar, node.heuristic)
+                print(f'Minimum Heuristic has been updated to {minCostSoFar}!')
             repeated.add(np.array2string(node.state))
             if node.goalTest():
                 goalNode = node
                 finalDepth = node.weight
-                # getPath(node)
+                getPath(trenchnode=node)
                 return True
             else:
                 totalNodeExpansions += 1
@@ -143,10 +197,11 @@ class trenchNode(object):
                  parent=None
     ):
         if parent is not None:
-            self.weight = self.parent.weight
-            self.heuristic = self.parent.heuristic
-            self.state = self.parent.state
-            self.recessPositions = parent.recessPositions
+            self.parent = parent
+            self.weight = parent.weight
+            self.heuristic = parent.heuristic
+            self.state = np.array(parent.state)
+            self.recessPositions = list(parent.recessPositions)
         else:
             if startState is None:
                 raise ValueError("No state passed for node initialization")
@@ -165,10 +220,6 @@ class trenchNode(object):
                 self.heuristic = self.manhattanDistance()
         return
 
-    def printTrench(self):
-        print(self.state)
-        return
-
     def __eq__(self, other):
         return np.array_equal(self.state, other.state)
 
@@ -179,7 +230,6 @@ class trenchNode(object):
     def goalTest(self):
         # The sergent has the highest rank, so it's represented as the value 9
         # does the value in row 1 column 0 have a value of 9?
-        print(self.state[1, 0])
         if self.state[1, 0] == 9:
             return True
         else:
@@ -194,6 +244,34 @@ class trenchNode(object):
 
     def findBlanks(self):
         return np.where(self.state == 0)
+
+    def up(self, i=None, j=None):
+        # move blank up
+        temp                 = self.state[i - 1, j]
+        self.state[i - 1, j] = 0
+        self.state[i, j]     = temp
+        return
+
+    def down(self, i=None, j=None):
+        # move blank down
+        temp                 = self.state[i + 1, j]
+        self.state[i + 1, j] = 0
+        self.state[i, j]     = temp
+        return
+
+    def left(self, i=None, j=None):
+        # move blank left
+        temp                 = self.state[i, j - 1]
+        self.state[i, j - 1] = 0
+        self.state[i, j]     = temp
+        return
+
+    def right(self, i=None, j=None):
+        # move blank right
+        temp                 = self.state[i, j + 1]
+        self.state[i, j + 1] = 0
+        self.state[i, j]     = temp
+        return
 
 
 def main():
