@@ -10,12 +10,10 @@
 
 """
 
-Usage: $: python3 trenchPuzzleSearch.py -i 12345670 -m 3
-
-each element in the heap be a tuple, where the first element is of a type which accepts normal python comparisons
-for example, say I have a class named node, and some cost associated with it.
-Then, I could have a tuple for it in the heap as follows: (node.getCost(), node)
-Due to issues with nodes of equal cost, then the tuples in the heap have three elements: (cost, insertion index, node)
+Usage: $: python3 trenchPuzzleSearch.py -i 0234567891 -r 357
+Args:
+    -i: input trench
+    -r: input recess positions starting at position 0
 
 """
 
@@ -26,18 +24,14 @@ import datetime
 import numpy as np
 import heapq
 
-
 repeated = set()
-
-# unit test node cost function for min heap wrapper class
-# def nodeCost(node):
-#     return node[0]
 
 
 def aStar(node=None):
     return node.weight + node.heuristic
 
 
+# Trench queueing Function
 def trenchEnqueue(priorityQ=None, trenchnode=None):
     # We can move a blank tile/recess in four directions: up, down, left, right
     indexMatrix = trenchnode.findBlanks()
@@ -99,6 +93,7 @@ def trenchEnqueue(priorityQ=None, trenchnode=None):
     return
 
 
+# Get solution path
 def getPath(trenchnode=None):
     stack = list()
     while trenchnode is not None:
@@ -115,36 +110,37 @@ def getPath(trenchnode=None):
     return
 
 
+# Queue class with user-defined node
 class myHeap(object):
     def __init__(self, initial=None, key=lambda x: x):
         self.key = key
         self.index = 0
         if initial is not None:
-            self._data = [(key(item), i, item) for i, item in enumerate(initial)]
-            self.index = len(self._data)
-            heapq.heapify(self._data)
+            self.data = [(key(item), i, item) for i, item in enumerate(initial)]
+            self.index = len(self.data)
+            heapq.heapify(self.data)
         else:
-            self._data = []
+            self.data = []
 
     def push(self, item):
-        heapq.heappush(self._data, (self.key(item), self.index, item))
+        heapq.heappush(self.data, (self.key(item), self.index, item))
         self.index += 1
 
     def pop(self):
-        if not len(self._data) <= 0:
-            return heapq.heappop(self._data)[2]
+        if not len(self.data) <= 0:
+            return heapq.heappop(self.data)[2]
         else:
             print("Calling pop on an empty queue. Returning None")
             return None
 
     def getHeap(self):
-        return self._data
+        return self.data
 
     def empty(self):
-        return len(self._data) <= 0
+        return len(self.data) <= 0
 
     def size(self):
-        return len(self._data)
+        return len(self.data)
 
 
 class generalSearch(object):
@@ -157,11 +153,12 @@ class generalSearch(object):
     def search(self):
         qSize                  = 0
         totalNodeExpansions    = 0
-        # nodes                = MAKE-QUEUE(MAKE-NODE(self.problem.getInitialState()))
         nodes                  = myHeap(initial=[self.problem], key=self.queueingHeuristic)
-        while not nodes.empty():
-            qSize = max(qSize, nodes.size())
-            node  = nodes.pop()
+        # while not nodes.empty():
+        while not len(nodes.data) <= 0:  # can use statement above but using this for performance
+            nodeSize = nodes.size()
+            qSize    = nodeSize if nodeSize > qSize else qSize
+            node     = nodes.pop()
             repeated.add(np.array2string(node.state))
             if node.goalTest():
                 getPath(trenchnode=node)
@@ -172,29 +169,31 @@ class generalSearch(object):
         return False, qSize, totalNodeExpansions, node.weight
 
 
+# Class for a trench node, where the 2-D array is a NumPy array
+# Row 0 is the recess row
+# Row 1 is the trench with men
 class trenchNode(object):
     recessPos = None
 
-    def __init__(self, startState: str = None,
-                 heuristic: str = None,
-                 weight: int = 0,
-                 parent=None
-    ):
+    def __init__(self, startState: str = None, heuristic: str = None, weight: int = 0, parent=None):
         if parent is not None:
-            self.state = np.array(parent.state)
+            self.state       = np.array(parent.state)
         else:
             if startState is None:
                 raise ValueError("No state passed for node initialization")
-            tempState = list(startState)
-            tempStateTop = [-1 for _ in range(len(tempState))]
-            tempStateBottom = [int(tempState[i]) for i in range(len(tempState))]
-            self.state = np.zeros(shape=(2, len(tempState)))
+
+            tempState        = list(startState)
+            tempStateTop     = [-1 for _ in range(len(tempState))]
+            tempStateBottom  = [int(tempState[i]) for i in range(len(tempState))]
+            self.state       = np.zeros(shape=(2, len(tempState)))
             self.state[0, :] = tempStateTop
+
             self.state[0, list(trenchNode.recessPos)] = 0
+
             self.state[1, :] = tempStateBottom
-            self.state = self.state.astype('int8')
-            self.weight = weight
-            self.parent = None
+            self.state       = self.state.astype('int8')
+            self.weight      = weight
+            self.parent      = None
             if heuristic == 'Manhattan':
                 self.heuristic = self.manhattanDistance()
         return
@@ -272,21 +271,6 @@ def main():
     else:
         print("Error: Invalid mode chosen.")
 
-
-    # Unit test min heap wrapper
-    # ##########################################################################################
-    # test = [(4, 'young'), (5, 'old'), (1, 'baby')]
-    # myheap = myHeap(initial=test, key=nodeCost)
-    # print(myheap.getHeap())
-    # myheap.pop()
-    # print(myheap.empty())
-    # print(myheap.getHeap())
-    # myheap.pop()
-    # print(myheap.getHeap())
-    # myheap.pop()
-    # print(myheap.getHeap())
-    # print(myheap.empty())
-    # ##########################################################################################
     trenchNode.recessPos = set([int(i) for i in args.recesses])
     trench               =    trenchNode(startState=inputTrace,
                                          weight=0,
